@@ -1,0 +1,279 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CCPWGL2 glTF Exporter Demo</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
+            color: #fff;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+        header {
+            background: rgba(0, 0, 0, 0.3);
+            padding: 20px;
+            text-align: center;
+            border-bottom: 2px solid rgba(255, 255, 255, 0.1);
+        }
+        h1 { font-size: 28px; font-weight: 600; margin-bottom: 8px; }
+        .subtitle { font-size: 14px; opacity: 0.8; }
+        .container { display: flex; flex: 1; padding: 20px; gap: 20px; }
+        .panel {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            border-radius: 12px;
+            padding: 20px;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+        .control-panel { width: 350px; display: flex; flex-direction: column; gap: 20px; }
+        .viewer-panel { flex: 1; display: flex; flex-direction: column; }
+        .section { background: rgba(0, 0, 0, 0.2); padding: 15px; border-radius: 8px; }
+        .section-title {
+            font-size: 16px;
+            font-weight: 600;
+            margin-bottom: 12px;
+            padding-bottom: 8px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+        }
+        .form-group { margin-bottom: 15px; }
+        label { display: block; font-size: 13px; margin-bottom: 6px; opacity: 0.9; }
+        input[type="text"], select {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            border-radius: 6px;
+            background: rgba(0, 0, 0, 0.3);
+            color: #fff;
+            font-size: 14px;
+        }
+        input[type="text"]:focus, select:focus {
+            outline: none;
+            border-color: #4CAF50;
+            background: rgba(0, 0, 0, 0.4);
+        }
+        option { background: #2a3f5f; color: #fff; }
+        button {
+            width: 100%;
+            padding: 12px 20px;
+            border: none;
+            border-radius: 6px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        .btn-primary {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: #fff;
+        }
+        .btn-primary:hover { transform: translateY(-2px); box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4); }
+        .btn-success {
+            background: linear-gradient(135deg, #56ab2f 0%, #a8e063 100%);
+            color: #fff;
+        }
+        .btn-success:hover { transform: translateY(-2px); box-shadow: 0 4px 12px rgba(86, 171, 47, 0.4); }
+        .btn-secondary { background: rgba(255, 255, 255, 0.2); color: #fff; margin-top: 8px; }
+        .btn-secondary:hover { background: rgba(255, 255, 255, 0.3); }
+        button:disabled { opacity: 0.5; cursor: not-allowed; }
+        button:disabled:hover { transform: none; box-shadow: none; }
+        #canvas {
+            width: 100%;
+            height: 500px;
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 8px;
+            border: 2px solid rgba(255, 255, 255, 0.2);
+        }
+        .status { padding: 10px; border-radius: 6px; font-size: 13px; margin-top: 10px; }
+        .status.info { background: rgba(33, 150, 243, 0.3); border: 1px solid rgba(33, 150, 243, 0.5); }
+        .status.success { background: rgba(76, 175, 80, 0.3); border: 1px solid rgba(76, 175, 80, 0.5); }
+        .status.error { background: rgba(244, 67, 54, 0.3); border: 1px solid rgba(244, 67, 54, 0.5); }
+        .mesh-list { max-height: 200px; overflow-y: auto; background: rgba(0, 0, 0, 0.2); border-radius: 6px; padding: 8px; }
+        .mesh-item {
+            padding: 8px;
+            margin-bottom: 6px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 4px;
+            cursor: pointer;
+            transition: all 0.2s;
+            font-size: 13px;
+        }
+        .mesh-item:hover { background: rgba(255, 255, 255, 0.2); transform: translateX(4px); }
+        .mesh-item.selected { background: rgba(102, 126, 234, 0.4); border: 1px solid rgba(102, 126, 234, 0.6); }
+        .checkbox-group { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; }
+        input[type="checkbox"] { width: 18px; height: 18px; cursor: pointer; }
+        .export-options { display: flex; flex-direction: column; gap: 8px; }
+        footer {
+            background: rgba(0, 0, 0, 0.3);
+            padding: 15px;
+            text-align: center;
+            font-size: 12px;
+            opacity: 0.8;
+            border-top: 1px solid rgba(255, 255, 255, 0.1);
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <h1>🚀 CCPWGL2 glTF Exporter</h1>
+        <p class="subtitle">Load EVE Online ship models and export to glTF 2.0 format</p>
+    </header>
+
+    <div class="container">
+        <div class="control-panel">
+            <div class="panel section">
+                <div class="section-title">📦 Load Model</div>
+                <div class="form-group">
+                    <label for="modelPath">Model Path (Resource URL)</label>
+                    <input type="text" id="modelPath" placeholder="res:/path/to/model.red" 
+                           value="res:/dx9/model/ship/amarr/battleship/ab1/ab1_t1_lod1.red">
+                </div>
+                <button class="btn-primary" id="loadBtn">Load Model</button>
+                <div id="loadStatus"></div>
+            </div>
+
+            <div class="panel section">
+                <div class="section-title">🎨 Meshes & Materials</div>
+                <div id="meshList" class="mesh-list">
+                    <p style="opacity: 0.6; padding: 20px; text-align: center;">
+                        Load a model to see available meshes
+                    </p>
+                </div>
+            </div>
+
+            <div class="panel section">
+                <div class="section-title">⚙️ Export Options</div>
+                <div class="export-options">
+                    <div class="checkbox-group">
+                        <input type="checkbox" id="embedImages" checked>
+                        <label for="embedImages" style="margin: 0;">Embed Images (Base64)</label>
+                    </div>
+                    <div class="checkbox-group">
+                        <input type="checkbox" id="includeMaterials" checked>
+                        <label for="includeMaterials" style="margin: 0;">Include Materials</label>
+                    </div>
+                    <div class="checkbox-group">
+                        <input type="checkbox" id="includeAnimations" checked>
+                        <label for="includeAnimations" style="margin: 0;">Include Animations</label>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label for="exportFilename">Export Filename</label>
+                    <input type="text" id="exportFilename" value="ship_model.gltf">
+                </div>
+                <button class="btn-success" id="exportBtn" disabled>Export to glTF</button>
+                <button class="btn-secondary" id="exportJsonBtn" disabled>View as JSON</button>
+                <div id="exportStatus"></div>
+            </div>
+        </div>
+
+        <div class="viewer-panel panel">
+            <div class="section-title">👁️ 3D Viewer</div>
+            <canvas id="canvas"></canvas>
+            <div id="viewerStatus" class="status info" style="margin-top: 15px;">
+                <strong>Status:</strong> Waiting for model to load...
+            </div>
+        </div>
+    </div>
+
+    <footer>
+        <p>CCPWGL2 glTF Exporter Demo | Built with ❤️ for the EVE Online community</p>
+        <p style="margin-top: 5px; font-size: 11px;">
+            This demo shows the export UI. For full functionality, load the CCPWGL2 library.
+        </p>
+    </footer>
+
+    <script src="../dist/ccpwgl2_int.js"></script>
+    
+    <script>
+        let currentMeshes = [], selectedMeshIndices = new Set();
+        const $ = id => document.getElementById(id);
+        const showStatus = (el, type, msg) => {
+            el.className = `status ${type}`;
+            el.innerHTML = `<strong>${type.charAt(0).toUpperCase() + type.slice(1)}:</strong> ${msg}`;
+        };
+
+        if (typeof CCPWGL === 'undefined') {
+            showStatus($('viewerStatus'), 'error', 'CCPWGL2 not loaded. Showing demo UI only.');
+        } else {
+            showStatus($('viewerStatus'), 'success', 'CCPWGL2 loaded! Ready to export.');
+        }
+
+        $('loadBtn').onclick = () => {
+            currentMeshes = [
+                { name: 'Hull', index: 0, areas: 5 },
+                { name: 'Engines', index: 1, areas: 2 },
+                { name: 'Weapons', index: 2, areas: 3 }
+            ];
+            const list = $('meshList');
+            list.innerHTML = '';
+            currentMeshes.forEach((m, i) => {
+                const div = document.createElement('div');
+                div.className = 'mesh-item' + (i === 0 ? ' selected' : '');
+                div.innerHTML = `<strong>${m.name}</strong><br><small style="opacity:0.7">Index: ${m.index} | Areas: ${m.areas}</small>`;
+                div.onclick = () => {
+                    if (selectedMeshIndices.has(i)) {
+                        selectedMeshIndices.delete(i);
+                        div.classList.remove('selected');
+                    } else {
+                        selectedMeshIndices.add(i);
+                        div.classList.add('selected');
+                    }
+                };
+                if (i === 0) selectedMeshIndices.add(i);
+                list.appendChild(div);
+            });
+            showStatus($('loadStatus'), 'success', `${currentMeshes.length} meshes loaded (demo)`);
+            showStatus($('viewerStatus'), 'success', 'Model ready for export (demo mode)');
+            $('exportBtn').disabled = false;
+            $('exportJsonBtn').disabled = false;
+        };
+
+        $('exportBtn').onclick = () => {
+            if (selectedMeshIndices.size === 0) {
+                showStatus($('exportStatus'), 'error', 'Select at least one mesh');
+                return;
+            }
+            const gltf = {
+                asset: { version: "2.0", generator: "CCPWGL2 glTF Exporter" },
+                scene: 0,
+                scenes: [{ name: "Scene", nodes: [0] }],
+                nodes: [{ name: "DemoMesh", mesh: 0 }],
+                meshes: [{ name: "Mesh", primitives: [{ attributes: { POSITION: 0 }, mode: 4 }] }],
+                accessors: [{ bufferView: 0, componentType: 5126, count: 3, type: "VEC3" }],
+                bufferViews: [{ buffer: 0, byteLength: 36, target: 34962 }],
+                buffers: [{ byteLength: 36, uri: "data:application/octet-stream;base64,AAAAAAAAAAAAAAAA" }]
+            };
+            const json = JSON.stringify(gltf, null, 2);
+            const blob = new Blob([json], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = $('exportFilename').value;
+            a.click();
+            URL.revokeObjectURL(url);
+            showStatus($('exportStatus'), 'success', 'Export complete!');
+        };
+
+        $('exportJsonBtn').onclick = () => {
+            if (selectedMeshIndices.size === 0) {
+                showStatus($('exportStatus'), 'error', 'Select at least one mesh');
+                return;
+            }
+            const gltf = {
+                asset: { version: "2.0", generator: "CCPWGL2 glTF Exporter" },
+                scene: 0,
+                scenes: [{ name: "Scene", nodes: [0] }],
+                nodes: [{ name: "DemoMesh" }]
+            };
+            const w = window.open('', '_blank');
+            w.document.write(`<html><head><title>glTF JSON</title><style>body{background:#1e1e1e;color:#d4d4d4;font-family:monospace;padding:20px}pre{white-space:pre-wrap}</style></head><body><h2>glTF 2.0 JSON Output</h2><pre>${JSON.stringify(gltf, null, 2)}</pre></body></html>`);
+            showStatus($('exportStatus'), 'success', 'JSON opened in new window');
+        };
+    </script>
+</body>
+</html>
