@@ -1,5 +1,4 @@
 import { meta } from "utils";
-import { vec3, vec4, mat4, quat } from "math";
 
 
 /**
@@ -322,11 +321,15 @@ export class Tw2GltfExporter
             normalized: false
         };
 
-        // Add min/max for POSITION
+        // Add min/max for POSITION by calculating from actual data
         if (element.usage === 0) // POSITION
         {
-            accessorData.min = [ -1, -1, -1 ];
-            accessorData.max = [ 1, 1, 1 ];
+            const minMax = this._CalculateMinMax(bufferData, element, count, stride);
+            if (minMax)
+            {
+                accessorData.min = minMax.min;
+                accessorData.max = minMax.max;
+            }
         }
 
         const index = this.accessors.length;
@@ -369,8 +372,20 @@ export class Tw2GltfExporter
             target: 34963 // ELEMENT_ARRAY_BUFFER
         });
 
-        // Create accessor
-        const componentType = indexData instanceof Uint16Array ? 5123 : 5125;
+        // Create accessor with proper component type detection
+        let componentType = 5125; // Default to UNSIGNED_INT
+        if (indexData instanceof Uint8Array)
+        {
+            componentType = 5121; // UNSIGNED_BYTE
+        }
+        else if (indexData instanceof Uint16Array)
+        {
+            componentType = 5123; // UNSIGNED_SHORT
+        }
+        else if (indexData instanceof Uint32Array)
+        {
+            componentType = 5125; // UNSIGNED_INT
+        }
         
         const accessorData = {
             bufferView: bufferViewIndex,
@@ -647,6 +662,77 @@ export class Tw2GltfExporter
         };
 
         return typeMap[elements] || "SCALAR";
+    }
+
+    /**
+     * Calculates min/max values for vertex attribute data
+     * @param {TypedArray} bufferData - Buffer data
+     * @param {Tw2VertexElement} element - Vertex element
+     * @param {number} count - Vertex count
+     * @param {number} stride - Vertex stride
+     * @returns {Object|null} Object with min and max arrays
+     * @private
+     */
+    _CalculateMinMax(bufferData, element, count, stride)
+    {
+        if (!bufferData || !element || element.elements < 1 || element.elements > 4)
+        {
+            return null;
+        }
+
+        const elementCount = element.elements;
+        const offset = element.offset || 0;
+        const min = new Array(elementCount).fill(Infinity);
+        const max = new Array(elementCount).fill(-Infinity);
+
+        // Create a view of the buffer based on the element type
+        const bytesPerElement = this._GetBytesPerComponent(element.type);
+        const byteOffset = bufferData.byteOffset + offset;
+        
+        let dataView;
+        if (element.type === 5126) // FLOAT
+        {
+            dataView = new Float32Array(bufferData.buffer, byteOffset);
+        }
+        else
+        {
+            return null; // Only support float for now
+        }
+
+        // Iterate through vertices
+        const strideInElements = stride / bytesPerElement;
+        for (let i = 0; i < count; i++)
+        {
+            const baseIndex = i * strideInElements;
+            for (let j = 0; j < elementCount; j++)
+            {
+                const value = dataView[baseIndex + j];
+                if (value < min[j]) min[j] = value;
+                if (value > max[j]) max[j] = value;
+            }
+        }
+
+        return { min, max };
+    }
+
+    /**
+     * Gets bytes per component for a given type
+     * @param {number} type - Component type
+     * @returns {number} Bytes per component
+     * @private
+     */
+    _GetBytesPerComponent(type)
+    {
+        const bytesMap = {
+            5120: 1, // BYTE
+            5121: 1, // UNSIGNED_BYTE
+            5122: 2, // SHORT
+            5123: 2, // UNSIGNED_SHORT
+            5124: 4, // INT
+            5125: 4, // UNSIGNED_INT
+            5126: 4  // FLOAT
+        };
+        return bytesMap[type] || 4;
     }
 
     /**
