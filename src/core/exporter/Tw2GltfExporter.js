@@ -301,15 +301,23 @@ export class Tw2GltfExporter
         // Create or get buffer
         const bufferIndex = this._GetOrCreateBuffer(bufferData);
         
-        // Create buffer view
-        const bufferViewIndex = this.bufferViews.length;
-        this.bufferViews.push({
+        // Create buffer view - only add byteStride if data is interleaved (stride > element size)
+        const elementSize = this._GetBytesPerComponent(element.type) * element.elements;
+        const bufferViewData = {
             buffer: bufferIndex,
             byteOffset: 0,
             byteLength: bufferData.byteLength,
-            byteStride: stride,
             target: 34962 // ARRAY_BUFFER
-        });
+        };
+
+        // Only add byteStride if the data is interleaved (stride is larger than element size)
+        if (stride > elementSize)
+        {
+            bufferViewData.byteStride = stride;
+        }
+
+        const bufferViewIndex = this.bufferViews.length;
+        this.bufferViews.push(bufferViewData);
 
         // Create accessor
         const accessorData = {
@@ -758,13 +766,29 @@ export class Tw2GltfExporter
     }
 
     /**
-     * Exports to JSON string
+     * Exports to JSON string with validation
      * @param {Object} gltf - glTF object
      * @param {number} [space=2] - Indentation spaces
      * @returns {string} JSON string
      */
     static ToJSON(gltf, space = 2)
     {
+        // Validate basic glTF structure
+        if (!gltf.asset || gltf.asset.version !== "2.0")
+        {
+            throw new Error("Invalid glTF: missing or incorrect asset.version");
+        }
+        
+        if (!gltf.scenes || !Array.isArray(gltf.scenes) || gltf.scenes.length === 0)
+        {
+            throw new Error("Invalid glTF: missing scenes array");
+        }
+        
+        if (typeof gltf.scene !== "number")
+        {
+            throw new Error("Invalid glTF: missing default scene index");
+        }
+        
         return JSON.stringify(gltf, null, space);
     }
 

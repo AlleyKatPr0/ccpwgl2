@@ -126,13 +126,22 @@
     <div class="container">
         <div class="control-panel">
             <div class="panel section">
-                <div class="section-title">📦 Load Model</div>
+                <div class="section-title">📦 Select Model</div>
                 <div class="form-group">
-                    <label for="modelPath">Model Path (Resource URL)</label>
-                    <input type="text" id="modelPath" placeholder="res:/path/to/model.red" 
-                           value="res:/dx9/model/ship/amarr/battleship/ab1/ab1_t1_lod1.red">
+                    <label for="modelSelect">Choose a Model</label>
+                    <select id="modelSelect">
+                        <option value="">-- Select a model --</option>
+                        <option value="res:/dx9/model/ship/amarr/battleship/ab1/ab1_t1_lod1.red">Amarr Battleship (Abaddon)</option>
+                        <option value="res:/dx9/model/ship/amarr/frigate/af1/af1_t1_lod1.red">Amarr Frigate (Punisher)</option>
+                        <option value="res:/dx9/model/ship/caldari/battleship/cb1/cb1_t1_lod1.red">Caldari Battleship (Raven)</option>
+                        <option value="res:/dx9/model/ship/caldari/frigate/cf1/cf1_t1_lod1.red">Caldari Frigate (Merlin)</option>
+                        <option value="res:/dx9/model/ship/gallente/battleship/gb1/gb1_t1_lod1.red">Gallente Battleship (Megathron)</option>
+                        <option value="res:/dx9/model/ship/gallente/frigate/gf1/gf1_t1_lod1.red">Gallente Frigate (Tristan)</option>
+                        <option value="res:/dx9/model/ship/minmatar/battleship/mb1/mb1_t1_lod1.red">Minmatar Battleship (Tempest)</option>
+                        <option value="res:/dx9/model/ship/minmatar/frigate/mf1/mf1_t1_lod1.red">Minmatar Frigate (Rifter)</option>
+                    </select>
                 </div>
-                <button class="btn-primary" id="loadBtn">Load Model</button>
+                <button class="btn-primary" id="loadBtn">Load Selected Model</button>
                 <div id="loadStatus"></div>
             </div>
 
@@ -183,7 +192,7 @@
     <footer>
         <p>CCPWGL2 glTF Exporter Demo | Built with ❤️ for the EVE Online community</p>
         <p style="margin-top: 5px; font-size: 11px;">
-            This demo shows the export UI. For full functionality, load the CCPWGL2 library.
+            This demo exports valid glTF 2.0 files. The 3D viewer canvas is available for CCPWGL2 integration.
         </p>
     </footer>
 
@@ -191,24 +200,165 @@
     
     <script>
         let currentMeshes = [], selectedMeshIndices = new Set();
+        let tw2, device, scene, loadedObject = null;
         const $ = id => document.getElementById(id);
         const showStatus = (el, type, msg) => {
             el.className = `status ${type}`;
             el.innerHTML = `<strong>${type.charAt(0).toUpperCase() + type.slice(1)}:</strong> ${msg}`;
         };
 
-        if (typeof CCPWGL === 'undefined') {
-            showStatus($('viewerStatus'), 'error', 'CCPWGL2 not loaded. Showing demo UI only.');
-        } else {
-            showStatus($('viewerStatus'), 'success', 'CCPWGL2 loaded! Ready to export.');
+        // Initialize CCPWGL2 WebGL renderer
+        function initViewer() {
+            try {
+                if (typeof CCPWGL === 'undefined' || !window.CCPWGL) {
+                    showStatus($('viewerStatus'), 'error', 'CCPWGL2 library not loaded. Build the library first: npm install && npm run build');
+                    return false;
+                }
+
+                tw2 = window.CCPWGL;
+                const canvas = $('canvas');
+                
+                // Create WebGL device
+                tw2.device.Create({ canvas: canvas });
+                device = tw2.device;
+                
+                // Start render loop
+                function render() {
+                    device.Tick();
+                    
+                    if (device.gl) {
+                        device.gl.clearColor(0.1, 0.15, 0.2, 1.0);
+                        device.gl.clear(device.gl.COLOR_BUFFER_BIT | device.gl.DEPTH_BUFFER_BIT);
+                    }
+                    
+                    if (loadedObject && loadedObject.Update) {
+                        loadedObject.Update(device.dt);
+                    }
+                    
+                    if (loadedObject && loadedObject.GetBatches) {
+                        const batches = [];
+                        loadedObject.GetBatches(0, batches);
+                        device.RenderBatches(batches);
+                    }
+                    
+                    requestAnimationFrame(render);
+                }
+                render();
+                
+                showStatus($('viewerStatus'), 'success', 'WebGL renderer initialized. Ready to load models.');
+                return true;
+            } catch (err) {
+                showStatus($('viewerStatus'), 'error', 'Failed to initialize WebGL: ' + err.message);
+                console.error(err);
+                return false;
+            }
         }
 
+        // Initialize on page load
+        window.addEventListener('DOMContentLoaded', () => {
+            if (!initViewer()) {
+                // Fallback to demo mode if WebGL init fails
+                showStatus($('viewerStatus'), 'info', 'Running in demo mode. Export will generate valid glTF files.');
+            }
+        });
+
         $('loadBtn').onclick = () => {
+            const modelPath = $('modelSelect').value;
+            
+            if (!modelPath) {
+                showStatus($('loadStatus'), 'error', 'Please select a model from the list');
+                return;
+            }
+            
+            if (tw2 && tw2.resMan) {
+                // Clear previous model
+                loadedObject = null;
+                currentMeshes = [];
+                selectedMeshIndices.clear();
+                $('exportBtn').disabled = true;
+                $('exportJsonBtn').disabled = true;
+                
+                // Try to load actual model
+                showStatus($('loadStatus'), 'info', 'Loading model from: ' + modelPath);
+                showStatus($('viewerStatus'), 'info', 'Loading model...');
+                
+                try {
+                    loadedObject = tw2.Load(modelPath);
+                    
+                    if (!loadedObject) {
+                        throw new Error('Failed to create object from path');
+                    }
+                    
+                    // Wait for model to load
+                    let attempts = 0;
+                    const maxAttempts = 100; // 10 seconds with 100ms intervals
+                    
+                    const checkLoaded = setInterval(() => {
+                        attempts++;
+                        
+                        // Check if loaded
+                        if (loadedObject && loadedObject.loaded !== false) {
+                            clearInterval(checkLoaded);
+                            
+                            // Extract meshes from loaded object
+                            currentMeshes = [];
+                            if (loadedObject.meshes && loadedObject.meshes.length > 0) {
+                                loadedObject.meshes.forEach((mesh, i) => {
+                                    currentMeshes.push({
+                                        name: mesh.name || `Mesh ${i}`,
+                                        index: i,
+                                        areas: (mesh.opaqueAreas?.length || 0) + (mesh.transparentAreas?.length || 0),
+                                        mesh: mesh
+                                    });
+                                });
+                                
+                                updateMeshList();
+                                showStatus($('loadStatus'), 'success', `Loaded ${currentMeshes.length} mesh(es) from ${modelPath.split('/').pop()}`);
+                                showStatus($('viewerStatus'), 'success', 'Model is now visible in the 3D viewer');
+                                $('exportBtn').disabled = false;
+                                $('exportJsonBtn').disabled = false;
+                            } else {
+                                // No meshes found, but object loaded
+                                showStatus($('loadStatus'), 'error', 'Model loaded but no meshes found. Check console for details.');
+                                console.log('Loaded object:', loadedObject);
+                                loadDemoMeshes();
+                            }
+                        } else if (attempts >= maxAttempts) {
+                            // Timeout
+                            clearInterval(checkLoaded);
+                            showStatus($('loadStatus'), 'error', 'Model loading timeout. The resource server may be unavailable.');
+                            showStatus($('viewerStatus'), 'error', 'Failed to load model. Using demo fallback.');
+                            console.error('Loading timed out. Resource server may not be available.');
+                            loadDemoMeshes();
+                        }
+                    }, 100);
+                    
+                } catch (err) {
+                    showStatus($('loadStatus'), 'error', 'Load failed: ' + err.message);
+                    console.error('Load error:', err);
+                    loadDemoMeshes();
+                }
+            } else {
+                // Fallback to demo mode
+                showStatus($('loadStatus'), 'error', 'CCPWGL2 not available. Using demo mode.');
+                loadDemoMeshes();
+            }
+        };
+
+        function loadDemoMeshes() {
             currentMeshes = [
                 { name: 'Hull', index: 0, areas: 5 },
                 { name: 'Engines', index: 1, areas: 2 },
                 { name: 'Weapons', index: 2, areas: 3 }
             ];
+            updateMeshList();
+            showStatus($('loadStatus'), 'success', `${currentMeshes.length} demo mesh(es) created`);
+            showStatus($('viewerStatus'), 'info', 'Demo mode: Export will generate valid glTF triangle mesh');
+            $('exportBtn').disabled = false;
+            $('exportJsonBtn').disabled = false;
+        }
+
+        function updateMeshList() {
             const list = $('meshList');
             list.innerHTML = '';
             currentMeshes.forEach((m, i) => {
@@ -227,36 +377,53 @@
                 if (i === 0) selectedMeshIndices.add(i);
                 list.appendChild(div);
             });
-            showStatus($('loadStatus'), 'success', `${currentMeshes.length} meshes loaded (demo)`);
-            showStatus($('viewerStatus'), 'success', 'Model ready for export (demo mode)');
-            $('exportBtn').disabled = false;
-            $('exportJsonBtn').disabled = false;
-        };
+        }
 
         $('exportBtn').onclick = () => {
             if (selectedMeshIndices.size === 0) {
                 showStatus($('exportStatus'), 'error', 'Select at least one mesh');
                 return;
             }
-            const gltf = {
-                asset: { version: "2.0", generator: "CCPWGL2 glTF Exporter" },
-                scene: 0,
-                scenes: [{ name: "Scene", nodes: [0] }],
-                nodes: [{ name: "DemoMesh", mesh: 0 }],
-                meshes: [{ name: "Mesh", primitives: [{ attributes: { POSITION: 0 }, mode: 4 }] }],
-                accessors: [{ bufferView: 0, componentType: 5126, count: 3, type: "VEC3" }],
-                bufferViews: [{ buffer: 0, byteLength: 36, target: 34962 }],
-                buffers: [{ byteLength: 36, uri: "data:application/octet-stream;base64,AAAAAAAAAAAAAAAA" }]
-            };
-            const json = JSON.stringify(gltf, null, 2);
-            const blob = new Blob([json], { type: 'application/json' });
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = $('exportFilename').value;
-            a.click();
-            URL.revokeObjectURL(url);
-            showStatus($('exportStatus'), 'success', 'Export complete!');
+            
+            try {
+                let gltf;
+                
+                // Check if we have real meshes with the mesh property
+                const realMeshes = currentMeshes.filter((m, i) => selectedMeshIndices.has(i) && m.mesh);
+                
+                if (realMeshes.length > 0 && tw2 && tw2.Tw2GltfExporter) {
+                    // Use real CCPWGL2 exporter
+                    showStatus($('exportStatus'), 'info', 'Exporting actual mesh data...');
+                    const exporter = new tw2.Tw2GltfExporter({
+                        embedImages: $('embedImages').checked,
+                        materials: $('includeMaterials').checked,
+                        animations: $('includeAnimations').checked
+                    });
+                    
+                    if (realMeshes.length === 1) {
+                        gltf = exporter.ExportMesh(realMeshes[0].mesh);
+                    } else {
+                        const meshObjects = realMeshes.map(m => m.mesh);
+                        gltf = exporter.ExportMeshes(meshObjects, 'Scene');
+                    }
+                } else {
+                    // Fallback to demo glTF
+                    gltf = createDemoGltf();
+                }
+                
+                const json = JSON.stringify(gltf, null, 2);
+                const blob = new Blob([json], { type: 'application/json' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = $('exportFilename').value;
+                a.click();
+                URL.revokeObjectURL(url);
+                showStatus($('exportStatus'), 'success', 'Export complete! File is ready for viewing in glTF viewers.');
+            } catch (err) {
+                showStatus($('exportStatus'), 'error', 'Export failed: ' + err.message);
+                console.error(err);
+            }
         };
 
         $('exportJsonBtn').onclick = () => {
@@ -264,16 +431,152 @@
                 showStatus($('exportStatus'), 'error', 'Select at least one mesh');
                 return;
             }
-            const gltf = {
-                asset: { version: "2.0", generator: "CCPWGL2 glTF Exporter" },
-                scene: 0,
-                scenes: [{ name: "Scene", nodes: [0] }],
-                nodes: [{ name: "DemoMesh" }]
-            };
-            const w = window.open('', '_blank');
-            w.document.write(`<html><head><title>glTF JSON</title><style>body{background:#1e1e1e;color:#d4d4d4;font-family:monospace;padding:20px}pre{white-space:pre-wrap}</style></head><body><h2>glTF 2.0 JSON Output</h2><pre>${JSON.stringify(gltf, null, 2)}</pre></body></html>`);
-            showStatus($('exportStatus'), 'success', 'JSON opened in new window');
+            
+            try {
+                let gltf;
+                
+                // Check if we have real meshes
+                const realMeshes = currentMeshes.filter((m, i) => selectedMeshIndices.has(i) && m.mesh);
+                
+                if (realMeshes.length > 0 && tw2 && tw2.Tw2GltfExporter) {
+                    const exporter = new tw2.Tw2GltfExporter({
+                        embedImages: $('embedImages').checked,
+                        materials: $('includeMaterials').checked,
+                        animations: $('includeAnimations').checked
+                    });
+                    
+                    if (realMeshes.length === 1) {
+                        gltf = exporter.ExportMesh(realMeshes[0].mesh);
+                    } else {
+                        const meshObjects = realMeshes.map(m => m.mesh);
+                        gltf = exporter.ExportMeshes(meshObjects, 'Scene');
+                    }
+                } else {
+                    gltf = createDemoGltf();
+                }
+                
+                const json = JSON.stringify(gltf, null, 2);
+                const w = window.open('', '_blank');
+                w.document.write(`<html><head><title>glTF JSON</title><style>body{background:#1e1e1e;color:#d4d4d4;font-family:'Courier New',monospace;padding:20px;line-height:1.5}pre{white-space:pre-wrap;word-wrap:break-word}</style></head><body><h2 style="color:#4CAF50">glTF 2.0 JSON Output</h2><p style="color:#aaa;font-size:14px">This is a valid glTF 2.0 file that can be viewed in any glTF viewer</p><pre>${json}</pre></body></html>`);
+                showStatus($('exportStatus'), 'success', 'JSON opened in new window');
+            } catch (err) {
+                showStatus($('exportStatus'), 'error', 'JSON view failed: ' + err.message);
+                console.error(err);
+            }
         };
+
+        function createDemoGltf() {
+            // Create a simple triangle mesh with proper glTF 2.0 structure
+            const positions = new Float32Array([
+                0.0, 1.0, 0.0,
+                -1.0, -1.0, 0.0,
+                1.0, -1.0, 0.0
+            ]);
+            
+            const normals = new Float32Array([
+                0.0, 0.0, 1.0,
+                0.0, 0.0, 1.0,
+                0.0, 0.0, 1.0
+            ]);
+            
+            const indices = new Uint16Array([0, 1, 2]);
+
+            // Convert to base64
+            const posBase64 = arrayBufferToBase64(positions.buffer);
+            const normBase64 = arrayBufferToBase64(normals.buffer);
+            const idxBase64 = arrayBufferToBase64(indices.buffer);
+
+            return {
+                asset: {
+                    version: "2.0",
+                    generator: "CCPWGL2 glTF Exporter v1.0"
+                },
+                scene: 0,
+                scenes: [{
+                    name: "DemoScene",
+                    nodes: [0]
+                }],
+                nodes: [{
+                    name: "TriangleMesh",
+                    mesh: 0
+                }],
+                meshes: [{
+                    name: "Triangle",
+                    primitives: [{
+                        attributes: {
+                            POSITION: 0,
+                            NORMAL: 1
+                        },
+                        indices: 2,
+                        mode: 4 // TRIANGLES
+                    }]
+                }],
+                accessors: [
+                    {
+                        bufferView: 0,
+                        byteOffset: 0,
+                        componentType: 5126, // FLOAT
+                        count: 3,
+                        type: "VEC3",
+                        min: [-1.0, -1.0, 0.0],
+                        max: [1.0, 1.0, 0.0]
+                    },
+                    {
+                        bufferView: 1,
+                        byteOffset: 0,
+                        componentType: 5126, // FLOAT
+                        count: 3,
+                        type: "VEC3"
+                    },
+                    {
+                        bufferView: 2,
+                        byteOffset: 0,
+                        componentType: 5123, // UNSIGNED_SHORT
+                        count: 3,
+                        type: "SCALAR"
+                    }
+                ],
+                bufferViews: [
+                    {
+                        buffer: 0,
+                        byteOffset: 0,
+                        byteLength: positions.byteLength,
+                        target: 34962 // ARRAY_BUFFER
+                    },
+                    {
+                        buffer: 1,
+                        byteOffset: 0,
+                        byteLength: normals.byteLength,
+                        target: 34962 // ARRAY_BUFFER
+                    },
+                    {
+                        buffer: 2,
+                        byteOffset: 0,
+                        byteLength: indices.byteLength,
+                        target: 34963 // ELEMENT_ARRAY_BUFFER
+                    }
+                ],
+                buffers: [
+                    {
+                        byteLength: positions.byteLength,
+                        uri: `data:application/octet-stream;base64,${posBase64}`
+                    },
+                    {
+                        byteLength: normals.byteLength,
+                        uri: `data:application/octet-stream;base64,${normBase64}`
+                    },
+                    {
+                        byteLength: indices.byteLength,
+                        uri: `data:application/octet-stream;base64,${idxBase64}`
+                    }
+                ]
+            };
+        }
+
+        function arrayBufferToBase64(buffer) {
+            const bytes = new Uint8Array(buffer);
+            return btoa(Array.from(bytes, byte => String.fromCharCode(byte)).join(''));
+        }
     </script>
 </body>
 </html>
