@@ -26,30 +26,37 @@ This demo showcases the glTF 2.0 export functionality for CCPWGL2, allowing you 
 - A resource server for loading actual model files (for production use)
 - Modern web browser with WebGL support
 
-## 3D Viewer and Export Functionality
+## 3D Viewer with Model Selection
 
-This demo provides a **full WebGL 3D viewer** with glTF export capabilities.
+This demo provides a **full WebGL 3D viewer** with a model selection dropdown and glTF export capabilities.
 
 ### Features
 
+**Model Selection:**
+- Dropdown list with predefined EVE Online ship models
+- Multiple ship types from different factions (Amarr, Caldari, Gallente, Minmatar)
+- Easy one-click model loading
+
 **WebGL 3D Rendering:**
 - Real-time WebGL rendering using CCPWGL2
-- Standard WebGL renderer with render loop
-- Displays EVE Online ship models in 3D canvas
+- Standard WebGL renderer with continuous render loop
+- Displays selected models in 3D canvas
 - Interactive visualization of loaded models
 
 **Model Loading:**
-- Load EVE Online models from resource paths
+- Select a model from the dropdown list
+- Automatic model loading from resource paths
 - Automatic mesh extraction from loaded objects
 - Support for multiple meshes per model
+- Clear status updates during loading
 - Fallback to demo mode if resources unavailable
 
 **glTF 2.0 Export:**
 - Export loaded meshes to valid glTF 2.0 format
+- Uses **actual geometry from the loaded 3D model** (not placeholder data)
 - Support for single or multiple mesh export
 - Configurable options (materials, animations, image embedding)
-- Uses actual mesh geometry from loaded models
-- Fallback to valid demo triangle mesh if needed
+- Falls back to valid demo triangle mesh only if model loading fails
 
 ### How to Use
 
@@ -57,32 +64,66 @@ This demo provides a **full WebGL 3D viewer** with glTF export capabilities.
 1. Build the library: `npm install && npm run build`
 2. Open `demo/gltf-exporter.html` in a web browser
 
-**Loading Models:**
-1. Enter a model path in the "Model Path" field (e.g., `res:/dx9/model/ship/amarr/battleship/ab1/ab1_t1_lod1.red`)
-2. Click "Load Model"
-3. The model will be loaded, displayed in the 3D viewer, and meshes will be listed
+**Loading and Viewing Models:**
+1. Select a model from the "Choose a Model" dropdown (e.g., "Amarr Battleship")
+2. Click "Load Selected Model"
+3. The model will load and display in the 3D viewer canvas
+4. Available meshes will be listed in the "Meshes & Materials" section
 
 **Exporting to glTF:**
-1. Select which meshes to export from the list
+1. Once a model is loaded, select which meshes to export from the list
 2. Configure export options (embed images, materials, animations)
 3. Click "Export to glTF" to download the file
-4. The exported file will contain actual geometry from the loaded model
+4. **The exported file contains actual geometry from the loaded 3D model**, not a placeholder
 
 **Demo Mode Fallback:**
-If the CCPWGL2 library is not built or model loading fails, the demo falls back to creating valid sample glTF files with triangle geometry for testing.
+If the CCPWGL2 library is not built or model loading fails (e.g., resource server unavailable), the demo falls back to creating valid sample glTF files with triangle geometry for testing the export functionality.
 
 ### Technical Details
 
+**Model Selection:**
+- Predefined list of EVE Online ship models
+- Dropdown automatically populated with model paths
+- Validates selection before loading
+
 **WebGL Renderer:**
 - Initializes CCPWGL2 device with canvas
-- Runs continuous render loop
-- Handles model updates and batch rendering
+- Runs continuous render loop using `requestAnimationFrame`
+- Handles model updates with `Update()` and batch rendering with `GetBatches()`/`RenderBatches()`
 - Proper error handling and fallback modes
 
+**Model Loading Process:**
+1. User selects model from dropdown
+2. Previous model is cleared
+3. `tw2.Load(modelPath)` initiates loading
+4. Polls every 100ms for up to 10 seconds
+5. Extracts meshes when loaded
+6. Updates UI and enables export
+
 **Export Process:**
-- For loaded models: Uses Tw2GltfExporter to export actual mesh data
+- For loaded models: Uses `Tw2GltfExporter` to export **actual mesh data from the 3D model**
 - For demo mode: Generates valid glTF 2.0 triangle mesh
 - All exports are spec-compliant and viewable in standard glTF viewers
+
+### Troubleshooting
+
+**"CCPWGL2 library not loaded" error:**
+- Build the library first: `npm install && npm run build`
+
+**Models don't load / timeout:**
+- Ensure you have a resource server set up for EVE Online assets
+- The models in the dropdown require access to EVE Online's resource files
+- Demo mode export will still work and generate valid glTF files
+
+**Model loads but doesn't appear in canvas:**
+- Check browser console for WebGL errors
+- Ensure WebGL is enabled in your browser
+- The model may be very large or small - this is a known limitation
+
+**Export gives triangle instead of model:**
+- This means the model didn't load successfully
+- Check if the model appeared in the 3D viewer first
+- If the viewer shows the model but export gives a triangle, this is a bug - check console for errors
 
 ## Validation
 

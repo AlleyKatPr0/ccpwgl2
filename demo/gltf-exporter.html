@@ -126,13 +126,22 @@
     <div class="container">
         <div class="control-panel">
             <div class="panel section">
-                <div class="section-title">📦 Load Model</div>
+                <div class="section-title">📦 Select Model</div>
                 <div class="form-group">
-                    <label for="modelPath">Model Path (Resource URL)</label>
-                    <input type="text" id="modelPath" placeholder="res:/path/to/model.red" 
-                           value="res:/dx9/model/ship/amarr/battleship/ab1/ab1_t1_lod1.red">
+                    <label for="modelSelect">Choose a Model</label>
+                    <select id="modelSelect">
+                        <option value="">-- Select a model --</option>
+                        <option value="res:/dx9/model/ship/amarr/battleship/ab1/ab1_t1_lod1.red">Amarr Battleship (Abaddon)</option>
+                        <option value="res:/dx9/model/ship/amarr/frigate/af1/af1_t1_lod1.red">Amarr Frigate (Punisher)</option>
+                        <option value="res:/dx9/model/ship/caldari/battleship/cb1/cb1_t1_lod1.red">Caldari Battleship (Raven)</option>
+                        <option value="res:/dx9/model/ship/caldari/frigate/cf1/cf1_t1_lod1.red">Caldari Frigate (Merlin)</option>
+                        <option value="res:/dx9/model/ship/gallente/battleship/gb1/gb1_t1_lod1.red">Gallente Battleship (Megathron)</option>
+                        <option value="res:/dx9/model/ship/gallente/frigate/gf1/gf1_t1_lod1.red">Gallente Frigate (Tristan)</option>
+                        <option value="res:/dx9/model/ship/minmatar/battleship/mb1/mb1_t1_lod1.red">Minmatar Battleship (Tempest)</option>
+                        <option value="res:/dx9/model/ship/minmatar/frigate/mf1/mf1_t1_lod1.red">Minmatar Frigate (Rifter)</option>
+                    </select>
                 </div>
-                <button class="btn-primary" id="loadBtn">Load Model</button>
+                <button class="btn-primary" id="loadBtn">Load Selected Model</button>
                 <div id="loadStatus"></div>
             </div>
 
@@ -254,18 +263,40 @@
         });
 
         $('loadBtn').onclick = () => {
-            const modelPath = $('modelPath').value;
+            const modelPath = $('modelSelect').value;
+            
+            if (!modelPath) {
+                showStatus($('loadStatus'), 'error', 'Please select a model from the list');
+                return;
+            }
             
             if (tw2 && tw2.resMan) {
+                // Clear previous model
+                loadedObject = null;
+                currentMeshes = [];
+                selectedMeshIndices.clear();
+                $('exportBtn').disabled = true;
+                $('exportJsonBtn').disabled = true;
+                
                 // Try to load actual model
-                showStatus($('loadStatus'), 'info', 'Loading model...');
-                showStatus($('viewerStatus'), 'info', 'Loading ' + modelPath + '...');
+                showStatus($('loadStatus'), 'info', 'Loading model from: ' + modelPath);
+                showStatus($('viewerStatus'), 'info', 'Loading model...');
                 
                 try {
                     loadedObject = tw2.Load(modelPath);
                     
+                    if (!loadedObject) {
+                        throw new Error('Failed to create object from path');
+                    }
+                    
                     // Wait for model to load
+                    let attempts = 0;
+                    const maxAttempts = 100; // 10 seconds with 100ms intervals
+                    
                     const checkLoaded = setInterval(() => {
+                        attempts++;
+                        
+                        // Check if loaded
                         if (loadedObject && loadedObject.loaded !== false) {
                             clearInterval(checkLoaded);
                             
@@ -280,38 +311,36 @@
                                         mesh: mesh
                                     });
                                 });
+                                
+                                updateMeshList();
+                                showStatus($('loadStatus'), 'success', `Loaded ${currentMeshes.length} mesh(es) from ${modelPath.split('/').pop()}`);
+                                showStatus($('viewerStatus'), 'success', 'Model is now visible in the 3D viewer');
+                                $('exportBtn').disabled = false;
+                                $('exportJsonBtn').disabled = false;
                             } else {
-                                // Fallback to demo meshes
-                                currentMeshes = [
-                                    { name: 'Hull', index: 0, areas: 5 },
-                                    { name: 'Engines', index: 1, areas: 2 },
-                                    { name: 'Weapons', index: 2, areas: 3 }
-                                ];
+                                // No meshes found, but object loaded
+                                showStatus($('loadStatus'), 'error', 'Model loaded but no meshes found. Check console for details.');
+                                console.log('Loaded object:', loadedObject);
+                                loadDemoMeshes();
                             }
-                            
-                            updateMeshList();
-                            showStatus($('loadStatus'), 'success', `${currentMeshes.length} mesh(es) loaded from model`);
-                            showStatus($('viewerStatus'), 'success', 'Model loaded and displayed in viewer');
-                            $('exportBtn').disabled = false;
-                            $('exportJsonBtn').disabled = false;
+                        } else if (attempts >= maxAttempts) {
+                            // Timeout
+                            clearInterval(checkLoaded);
+                            showStatus($('loadStatus'), 'error', 'Model loading timeout. The resource server may be unavailable.');
+                            showStatus($('viewerStatus'), 'error', 'Failed to load model. Using demo fallback.');
+                            console.error('Loading timed out. Resource server may not be available.');
+                            loadDemoMeshes();
                         }
                     }, 100);
                     
-                    // Timeout after 10 seconds
-                    setTimeout(() => {
-                        clearInterval(checkLoaded);
-                        if (currentMeshes.length === 0) {
-                            showStatus($('loadStatus'), 'error', 'Model loading timeout. Using demo meshes.');
-                            loadDemoMeshes();
-                        }
-                    }, 10000);
-                    
                 } catch (err) {
                     showStatus($('loadStatus'), 'error', 'Load failed: ' + err.message);
+                    console.error('Load error:', err);
                     loadDemoMeshes();
                 }
             } else {
                 // Fallback to demo mode
+                showStatus($('loadStatus'), 'error', 'CCPWGL2 not available. Using demo mode.');
                 loadDemoMeshes();
             }
         };
