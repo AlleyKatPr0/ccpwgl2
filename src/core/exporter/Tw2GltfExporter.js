@@ -301,15 +301,23 @@ export class Tw2GltfExporter
         // Create or get buffer
         const bufferIndex = this._GetOrCreateBuffer(bufferData);
         
-        // Create buffer view
-        const bufferViewIndex = this.bufferViews.length;
-        this.bufferViews.push({
+        // Create buffer view - only add byteStride if data is interleaved (stride > element size)
+        const elementSize = this._GetBytesPerComponent(element.type) * element.elements;
+        const bufferViewData = {
             buffer: bufferIndex,
             byteOffset: 0,
             byteLength: bufferData.byteLength,
-            byteStride: stride,
             target: 34962 // ARRAY_BUFFER
-        });
+        };
+
+        // Only add byteStride if the data is interleaved (stride is larger than element size)
+        if (stride > elementSize)
+        {
+            bufferViewData.byteStride = stride;
+        }
+
+        const bufferViewIndex = this.bufferViews.length;
+        this.bufferViews.push(bufferViewData);
 
         // Create accessor
         const accessorData = {

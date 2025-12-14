@@ -26,7 +26,7 @@ This demo showcases the glTF 2.0 export functionality for CCPWGL2, allowing you 
 
 ## Demo Mode
 
-The current implementation includes a demo mode that simulates model loading and export functionality. This allows you to test the UI and export workflow without needing a full resource server setup.
+The current implementation includes a demo mode that creates valid glTF 2.0 geometry and exports it. The demo generates a simple triangle mesh with proper vertex attributes (positions, normals) and indices, producing standards-compliant glTF files that can be opened in any glTF viewer. This allows you to test the UI and export workflow without needing a full resource server setup.
 
 ## Export Options
 
