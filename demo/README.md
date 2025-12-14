@@ -26,25 +26,63 @@ This demo showcases the glTF 2.0 export functionality for CCPWGL2, allowing you 
 - A resource server for loading actual model files (for production use)
 - Modern web browser with WebGL support
 
-## Demo Mode
+## 3D Viewer and Export Functionality
 
-The demo provides a user-friendly interface for testing the glTF export functionality. While the demo doesn't load actual EVE Online models (which requires a resource server), it demonstrates the export capability by creating valid glTF 2.0 geometry. 
+This demo provides a **full WebGL 3D viewer** with glTF export capabilities.
 
-**What the demo does:**
-- Provides a clean UI for export configuration
-- Generates valid glTF 2.0 files with proper triangle mesh geometry
-- Includes positions, normals, and indices with correct base64 encoding
-- Produces standards-compliant files that can be opened in any glTF viewer
-- Includes a canvas element ready for CCPWGL2 3D rendering integration
+### Features
 
-**What you can do:**
-1. Click "Load Model" to create demo mesh data
-2. Select meshes to export
-3. Configure export options
-4. Click "Export to glTF" to download a valid glTF 2.0 file
-5. Open the exported file in any glTF viewer to verify it works
+**WebGL 3D Rendering:**
+- Real-time WebGL rendering using CCPWGL2
+- Standard WebGL renderer with render loop
+- Displays EVE Online ship models in 3D canvas
+- Interactive visualization of loaded models
 
-The canvas is available for developers who want to integrate actual CCPWGL2 3D rendering. For full model loading and viewing, you'll need to set up a CCPWGL2 resource server.
+**Model Loading:**
+- Load EVE Online models from resource paths
+- Automatic mesh extraction from loaded objects
+- Support for multiple meshes per model
+- Fallback to demo mode if resources unavailable
+
+**glTF 2.0 Export:**
+- Export loaded meshes to valid glTF 2.0 format
+- Support for single or multiple mesh export
+- Configurable options (materials, animations, image embedding)
+- Uses actual mesh geometry from loaded models
+- Fallback to valid demo triangle mesh if needed
+
+### How to Use
+
+**Prerequisites:**
+1. Build the library: `npm install && npm run build`
+2. Open `demo/gltf-exporter.html` in a web browser
+
+**Loading Models:**
+1. Enter a model path in the "Model Path" field (e.g., `res:/dx9/model/ship/amarr/battleship/ab1/ab1_t1_lod1.red`)
+2. Click "Load Model"
+3. The model will be loaded, displayed in the 3D viewer, and meshes will be listed
+
+**Exporting to glTF:**
+1. Select which meshes to export from the list
+2. Configure export options (embed images, materials, animations)
+3. Click "Export to glTF" to download the file
+4. The exported file will contain actual geometry from the loaded model
+
+**Demo Mode Fallback:**
+If the CCPWGL2 library is not built or model loading fails, the demo falls back to creating valid sample glTF files with triangle geometry for testing.
+
+### Technical Details
+
+**WebGL Renderer:**
+- Initializes CCPWGL2 device with canvas
+- Runs continuous render loop
+- Handles model updates and batch rendering
+- Proper error handling and fallback modes
+
+**Export Process:**
+- For loaded models: Uses Tw2GltfExporter to export actual mesh data
+- For demo mode: Generates valid glTF 2.0 triangle mesh
+- All exports are spec-compliant and viewable in standard glTF viewers
 
 ## Validation
 

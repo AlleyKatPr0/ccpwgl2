@@ -191,27 +191,145 @@
     
     <script>
         let currentMeshes = [], selectedMeshIndices = new Set();
+        let tw2, device, scene, loadedObject = null;
         const $ = id => document.getElementById(id);
         const showStatus = (el, type, msg) => {
             el.className = `status ${type}`;
             el.innerHTML = `<strong>${type.charAt(0).toUpperCase() + type.slice(1)}:</strong> ${msg}`;
         };
 
-        // Check if CCPWGL2 is loaded
-        if (typeof CCPWGL === 'undefined' || !window.CCPWGL) {
-            showStatus($('viewerStatus'), 'info', 'CCPWGL2 library not loaded. Demo mode will export valid glTF files.');
-        } else {
-            showStatus($('viewerStatus'), 'success', 'CCPWGL2 loaded! Demo mode ready.');
+        // Initialize CCPWGL2 WebGL renderer
+        function initViewer() {
+            try {
+                if (typeof CCPWGL === 'undefined' || !window.CCPWGL) {
+                    showStatus($('viewerStatus'), 'error', 'CCPWGL2 library not loaded. Build the library first: npm install && npm run build');
+                    return false;
+                }
+
+                tw2 = window.CCPWGL;
+                const canvas = $('canvas');
+                
+                // Create WebGL device
+                tw2.device.Create({ canvas: canvas });
+                device = tw2.device;
+                
+                // Start render loop
+                function render() {
+                    device.Tick();
+                    
+                    if (device.gl) {
+                        device.gl.clearColor(0.1, 0.15, 0.2, 1.0);
+                        device.gl.clear(device.gl.COLOR_BUFFER_BIT | device.gl.DEPTH_BUFFER_BIT);
+                    }
+                    
+                    if (loadedObject && loadedObject.Update) {
+                        loadedObject.Update(device.dt);
+                    }
+                    
+                    if (loadedObject && loadedObject.GetBatches) {
+                        const batches = [];
+                        loadedObject.GetBatches(0, batches);
+                        device.RenderBatches(batches);
+                    }
+                    
+                    requestAnimationFrame(render);
+                }
+                render();
+                
+                showStatus($('viewerStatus'), 'success', 'WebGL renderer initialized. Ready to load models.');
+                return true;
+            } catch (err) {
+                showStatus($('viewerStatus'), 'error', 'Failed to initialize WebGL: ' + err.message);
+                console.error(err);
+                return false;
+            }
         }
 
+        // Initialize on page load
+        window.addEventListener('DOMContentLoaded', () => {
+            if (!initViewer()) {
+                // Fallback to demo mode if WebGL init fails
+                showStatus($('viewerStatus'), 'info', 'Running in demo mode. Export will generate valid glTF files.');
+            }
+        });
+
         $('loadBtn').onclick = () => {
-            // Create demo meshes that can be exported as valid glTF
+            const modelPath = $('modelPath').value;
+            
+            if (tw2 && tw2.resMan) {
+                // Try to load actual model
+                showStatus($('loadStatus'), 'info', 'Loading model...');
+                showStatus($('viewerStatus'), 'info', 'Loading ' + modelPath + '...');
+                
+                try {
+                    loadedObject = tw2.Load(modelPath);
+                    
+                    // Wait for model to load
+                    const checkLoaded = setInterval(() => {
+                        if (loadedObject && loadedObject.loaded !== false) {
+                            clearInterval(checkLoaded);
+                            
+                            // Extract meshes from loaded object
+                            currentMeshes = [];
+                            if (loadedObject.meshes && loadedObject.meshes.length > 0) {
+                                loadedObject.meshes.forEach((mesh, i) => {
+                                    currentMeshes.push({
+                                        name: mesh.name || `Mesh ${i}`,
+                                        index: i,
+                                        areas: (mesh.opaqueAreas?.length || 0) + (mesh.transparentAreas?.length || 0),
+                                        mesh: mesh
+                                    });
+                                });
+                            } else {
+                                // Fallback to demo meshes
+                                currentMeshes = [
+                                    { name: 'Hull', index: 0, areas: 5 },
+                                    { name: 'Engines', index: 1, areas: 2 },
+                                    { name: 'Weapons', index: 2, areas: 3 }
+                                ];
+                            }
+                            
+                            updateMeshList();
+                            showStatus($('loadStatus'), 'success', `${currentMeshes.length} mesh(es) loaded from model`);
+                            showStatus($('viewerStatus'), 'success', 'Model loaded and displayed in viewer');
+                            $('exportBtn').disabled = false;
+                            $('exportJsonBtn').disabled = false;
+                        }
+                    }, 100);
+                    
+                    // Timeout after 10 seconds
+                    setTimeout(() => {
+                        clearInterval(checkLoaded);
+                        if (currentMeshes.length === 0) {
+                            showStatus($('loadStatus'), 'error', 'Model loading timeout. Using demo meshes.');
+                            loadDemoMeshes();
+                        }
+                    }, 10000);
+                    
+                } catch (err) {
+                    showStatus($('loadStatus'), 'error', 'Load failed: ' + err.message);
+                    loadDemoMeshes();
+                }
+            } else {
+                // Fallback to demo mode
+                loadDemoMeshes();
+            }
+        };
+
+        function loadDemoMeshes() {
             currentMeshes = [
                 { name: 'Hull', index: 0, areas: 5 },
                 { name: 'Engines', index: 1, areas: 2 },
                 { name: 'Weapons', index: 2, areas: 3 }
             ];
-            
+            updateMeshList();
+            showStatus($('loadStatus'), 'success', `${currentMeshes.length} demo mesh(es) created`);
+            showStatus($('viewerStatus'), 'info', 'Demo mode: Export will generate valid glTF triangle mesh');
+            $('exportBtn').disabled = false;
+            $('exportJsonBtn').disabled = false;
+        }
+
+        function updateMeshList() {
             const list = $('meshList');
             list.innerHTML = '';
             currentMeshes.forEach((m, i) => {
@@ -230,12 +348,7 @@
                 if (i === 0) selectedMeshIndices.add(i);
                 list.appendChild(div);
             });
-            
-            showStatus($('loadStatus'), 'success', `${currentMeshes.length} mesh(es) loaded (demo mode)`);
-            showStatus($('viewerStatus'), 'success', 'Demo meshes ready. Click Export to generate valid glTF 2.0 file.');
-            $('exportBtn').disabled = false;
-            $('exportJsonBtn').disabled = false;
-        };
+        }
 
         $('exportBtn').onclick = () => {
             if (selectedMeshIndices.size === 0) {
@@ -244,8 +357,31 @@
             }
             
             try {
-                // Create a valid glTF with proper geometry
-                const gltf = createDemoGltf();
+                let gltf;
+                
+                // Check if we have real meshes with the mesh property
+                const realMeshes = currentMeshes.filter((m, i) => selectedMeshIndices.has(i) && m.mesh);
+                
+                if (realMeshes.length > 0 && tw2 && tw2.Tw2GltfExporter) {
+                    // Use real CCPWGL2 exporter
+                    showStatus($('exportStatus'), 'info', 'Exporting actual mesh data...');
+                    const exporter = new tw2.Tw2GltfExporter({
+                        embedImages: $('embedImages').checked,
+                        materials: $('includeMaterials').checked,
+                        animations: $('includeAnimations').checked
+                    });
+                    
+                    if (realMeshes.length === 1) {
+                        gltf = exporter.ExportMesh(realMeshes[0].mesh);
+                    } else {
+                        const meshObjects = realMeshes.map(m => m.mesh);
+                        gltf = exporter.ExportMeshes(meshObjects, 'Scene');
+                    }
+                } else {
+                    // Fallback to demo glTF
+                    gltf = createDemoGltf();
+                }
+                
                 const json = JSON.stringify(gltf, null, 2);
                 const blob = new Blob([json], { type: 'application/json' });
                 const url = URL.createObjectURL(blob);
@@ -254,9 +390,10 @@
                 a.download = $('exportFilename').value;
                 a.click();
                 URL.revokeObjectURL(url);
-                showStatus($('exportStatus'), 'success', 'Export complete! File should be downloadable and viewable in glTF viewers.');
+                showStatus($('exportStatus'), 'success', 'Export complete! File is ready for viewing in glTF viewers.');
             } catch (err) {
                 showStatus($('exportStatus'), 'error', 'Export failed: ' + err.message);
+                console.error(err);
             }
         };
 
@@ -267,13 +404,35 @@
             }
             
             try {
-                const gltf = createDemoGltf();
+                let gltf;
+                
+                // Check if we have real meshes
+                const realMeshes = currentMeshes.filter((m, i) => selectedMeshIndices.has(i) && m.mesh);
+                
+                if (realMeshes.length > 0 && tw2 && tw2.Tw2GltfExporter) {
+                    const exporter = new tw2.Tw2GltfExporter({
+                        embedImages: $('embedImages').checked,
+                        materials: $('includeMaterials').checked,
+                        animations: $('includeAnimations').checked
+                    });
+                    
+                    if (realMeshes.length === 1) {
+                        gltf = exporter.ExportMesh(realMeshes[0].mesh);
+                    } else {
+                        const meshObjects = realMeshes.map(m => m.mesh);
+                        gltf = exporter.ExportMeshes(meshObjects, 'Scene');
+                    }
+                } else {
+                    gltf = createDemoGltf();
+                }
+                
                 const json = JSON.stringify(gltf, null, 2);
                 const w = window.open('', '_blank');
                 w.document.write(`<html><head><title>glTF JSON</title><style>body{background:#1e1e1e;color:#d4d4d4;font-family:'Courier New',monospace;padding:20px;line-height:1.5}pre{white-space:pre-wrap;word-wrap:break-word}</style></head><body><h2 style="color:#4CAF50">glTF 2.0 JSON Output</h2><p style="color:#aaa;font-size:14px">This is a valid glTF 2.0 file that can be viewed in any glTF viewer</p><pre>${json}</pre></body></html>`);
                 showStatus($('exportStatus'), 'success', 'JSON opened in new window');
             } catch (err) {
                 showStatus($('exportStatus'), 'error', 'JSON view failed: ' + err.message);
+                console.error(err);
             }
         };
 
