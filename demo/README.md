@@ -28,15 +28,23 @@ This demo showcases the glTF 2.0 export functionality for CCPWGL2, allowing you 
 
 ## Demo Mode
 
-The current implementation includes a demo mode that creates valid glTF 2.0 geometry and exports it. The demo generates a simple triangle mesh with proper vertex attributes (positions, normals) and indices, producing standards-compliant glTF files that can be opened in any glTF viewer. This allows you to test the UI and export workflow without needing a full resource server setup.
+The demo provides a user-friendly interface for testing the glTF export functionality. While the demo doesn't load actual EVE Online models (which requires a resource server), it demonstrates the export capability by creating valid glTF 2.0 geometry. 
 
-**The exported files include:**
-- Proper glTF 2.0 structure with asset metadata
-- Valid vertex data with positions and normals
-- Correctly formatted indices for triangle primitives
-- Base64-encoded binary data in data URIs
-- Proper byte offsets and buffer view configurations
-- Min/Max bounds for position data
+**What the demo does:**
+- Provides a clean UI for export configuration
+- Generates valid glTF 2.0 files with proper triangle mesh geometry
+- Includes positions, normals, and indices with correct base64 encoding
+- Produces standards-compliant files that can be opened in any glTF viewer
+- Includes a canvas element ready for CCPWGL2 3D rendering integration
+
+**What you can do:**
+1. Click "Load Model" to create demo mesh data
+2. Select meshes to export
+3. Configure export options
+4. Click "Export to glTF" to download a valid glTF 2.0 file
+5. Open the exported file in any glTF viewer to verify it works
+
+The canvas is available for developers who want to integrate actual CCPWGL2 3D rendering. For full model loading and viewing, you'll need to set up a CCPWGL2 resource server.
 
 ## Validation
 
