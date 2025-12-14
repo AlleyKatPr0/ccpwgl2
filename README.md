@@ -13,15 +13,17 @@ The resource files required for this library to work are no longer available, RI
 
 ### glTF 2.0 Export Capability
 
-Export WebGL-rendered EVE Online ship models to standard glTF 2.0 format!
+Export WebGL-rendered EVE Online ship models to standard glTF 2.0 format with full validation!
 
 **Features:**
 - Export meshes with vertex data (positions, normals, UVs, etc.)
 - Support for materials (PBR-based)
-- Buffer and accessor generation
+- Buffer and accessor generation with proper byte alignment
 - Base64 data URI embedding for standalone files
 - Multi-mesh scene export
 - Interactive demo UI for easy model export
+- **Full glTF 2.0 spec compliance** - files are readable by all glTF viewers
+- Automatic validation to ensure export integrity
 
 **Usage:**
 
@@ -47,7 +49,11 @@ const gltf = exporter.ExportMeshes([mesh1, mesh2, mesh3], 'ShipScene');
 
 **Demo:**
 
-Try the interactive demo at `demo/gltf-exporter.html` - a simple UI for loading models, selecting meshes/materials, and exporting to glTF with one click!
+Try the interactive demo at `demo/gltf-exporter.html` - a simple UI for loading models, selecting meshes/materials, and exporting to glTF with one click! The demo now generates valid glTF 2.0 files that can be opened in any glTF viewer like:
+- [glTF Viewer](https://gltf-viewer.donmccurdy.com/)
+- [Babylon.js Sandbox](https://sandbox.babylonjs.com/)
+- [Three.js Editor](https://threejs.org/editor/)
+- Blender (File → Import → glTF 2.0)
 
 See `demo/README.md` for more details.
 

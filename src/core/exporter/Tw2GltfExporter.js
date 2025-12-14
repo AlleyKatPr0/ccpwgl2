@@ -766,13 +766,29 @@ export class Tw2GltfExporter
     }
 
     /**
-     * Exports to JSON string
+     * Exports to JSON string with validation
      * @param {Object} gltf - glTF object
      * @param {number} [space=2] - Indentation spaces
      * @returns {string} JSON string
      */
     static ToJSON(gltf, space = 2)
     {
+        // Validate basic glTF structure
+        if (!gltf.asset || gltf.asset.version !== "2.0")
+        {
+            throw new Error("Invalid glTF: missing or incorrect asset.version");
+        }
+        
+        if (!gltf.scenes || !Array.isArray(gltf.scenes) || gltf.scenes.length === 0)
+        {
+            throw new Error("Invalid glTF: missing scenes array");
+        }
+        
+        if (typeof gltf.scene !== "number")
+        {
+            throw new Error("Invalid glTF: missing default scene index");
+        }
+        
         return JSON.stringify(gltf, null, space);
     }
 
