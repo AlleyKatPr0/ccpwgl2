@@ -14,19 +14,6 @@ export class Gr2CurveDataDaK32fC32f extends Gr2Curve2
 
 
     /**
-     * Gets the curve type
-     * @return {number}
-     */
-    GetCurveType()
-    {
-        const size = this.controls.length;
-        if (this.knots.length * 3 === size) return Gr2Curve2.Type.POSITION;
-        else if (this.knots.length * 4 === size) return Gr2Curve2.Type.ROTATION;
-        else if (this.knots.length * 9 === size) return Gr2Curve2.Type.SCALE_SHEAR;
-        throw new ErrGr2CurveDataControlSizeInvalid({ size });
-    }
-
-    /**
      * Gets knot count
      * @return {number}
      */
@@ -45,12 +32,25 @@ export class Gr2CurveDataDaK32fC32f extends Gr2Curve2
     }
 
     /**
+     * Gets the curve type
+     * @return {number}
+     */
+    GetCurveType()
+    {
+        const size = this.controls.length;
+        if (this.knots.length * 3 === size) return Gr2Curve2.Type.POSITION;
+        if (this.knots.length * 4 === size) return Gr2Curve2.Type.ROTATION;
+        if (this.knots.length * 9 === size) return Gr2Curve2.Type.SCALE_SHEAR;
+        throw new ErrGr2CurveDataControlSizeInvalid({ size });
+    }
+
+    /**
      * Gets the vec3 buffer
      * @return {Float32Array}
      */
     GetVec3Buffer()
     {
-        if (this.GetCurveType() === Gr2Curve2.Type.POSITION) return this.controls;
+        if (this.knots.length * 3 === this.controls.length) return this.controls;
         super.GetVec3Buffer();
     }
 
@@ -60,7 +60,7 @@ export class Gr2CurveDataDaK32fC32f extends Gr2Curve2
      */
     GetQuatBuffer()
     {
-        if (this.GetCurveType() === Gr2Curve2.Type.ROTATION) return this.controls;
+        if (this.knots.length * 4 === this.controls.length) return this.controls;
         super.GetQuatBuffer();
     }
 
@@ -70,7 +70,7 @@ export class Gr2CurveDataDaK32fC32f extends Gr2Curve2
      */
     GetMat3Buffer()
     {
-        if (this.GetCurveType() === Gr2Curve2.Type.SCALE_SHEAR) return this.controls;
+        if (this.knots.length * 9 === this.controls.length) return this.controls;
         super.GetMat3Buffer();
     }
 
