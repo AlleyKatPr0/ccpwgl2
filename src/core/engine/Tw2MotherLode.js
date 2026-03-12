@@ -367,10 +367,9 @@ export class Tw2MotherLode
     /**
      * Purges inactive loaded objects (resources that have been loaded but are not being actively used)
      * - Loaded objects can flagged with `doNotPurge` to ensure they are never removed
-     * - Resource auto purging can be managed in `ccpwgl` or `ccpwgl_int.resMan` - {@link Tw2ResMan}
-     *     ccpwgl.setResourceUnloadPolicy()
-     *     ccpwgl_int.resMan.autoPurgeResources=true
-     *     ccpwgl_int.resMan.purgeTime=30
+     * - Resource auto purging can be managed via `tw2.resMan` - {@link Tw2ResMan}
+     *     tw2.resMan.autoPurgeResources=true
+     *     tw2.resMan.purgeTime=30
      * @param {Number} curFrame - the current frame count
      * @param {Number} frameLimit - how many frames the object can stay alive for before being purged
      * @param {Number} frameDistance - how long the resource has been alive for
